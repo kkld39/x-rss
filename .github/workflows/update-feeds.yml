@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '7,37 * * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'accounts.yml'
+      - '.github/workflows/update-feeds.yml'
 
 concurrency:
   group: x-rss-pages
@@ -35,15 +40,18 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Check application
         run: python -m unittest discover -s tests -v
-      - name: Read Pages settings
-        id: pages
-        uses: actions/configure-pages@v5
       - name: Fetch X and build RSS
         id: update
         continue-on-error: true
-        env:
-          SITE_URL: ${{ steps.pages.outputs.base_url }}
-        run: python -m xrss.app
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          SITE_URL="https://$owner.github.io"
+          if [[ "${repo,,}" != "$owner.github.io" ]]; then
+            SITE_URL="$SITE_URL/$repo"
+          fi
+          export SITE_URL
+          python -m xrss.app
       - name: Save history and generated feeds
         if: steps.update.outputs.ready == 'true'
         env:
@@ -56,6 +64,10 @@ jobs:
             git commit -m 'Update X RSS history and feeds [skip ci]'
             git push origin "HEAD:$DEFAULT_BRANCH"
           fi
+      - name: Read Pages settings
+        if: success() && steps.update.outputs.ready == 'true'
+        id: pages
+        uses: actions/configure-pages@v5
       - name: Package site
         if: success() && steps.update.outputs.ready == 'true'
         uses: actions/upload-pages-artifact@v3
