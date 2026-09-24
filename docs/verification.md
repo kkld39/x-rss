@@ -54,7 +54,9 @@ Cookie、Authorization、Xアカウントのログインは使用していませ
 
 同日14:39 UTCの実取得レスポンスを初期履歴として `data/Mazda_PR.json` に20件保存し、`https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml` 用のRSSを11件生成しました。最終取得成功日時は元の取得時刻を保持し、最新試行は上記Probeの失敗として別に記録しています。初期履歴を最新取得成功のようには扱っていません。
 
-PagesへのデプロイとInoreaderへの実登録の確認は、以下に追記します。
+[2026-09-24 15:16 UTCのUpdate X RSS](https://github.com/kkld39/x-rss/actions/runs/36018938493) では、Xが示したリセット時刻の後に1回実行し、認証・Cookieなしで20件の投稿取得に成功しました。取得20件、新規0件（初期履歴と同一ID）、保存20件、RSS11件です。生成RSSと取得状態はActions自身がリポジトリにcommitしました。
+
+同Workflowの `Read Pages settings` は、Pagesサイト未設定のためHTTP 404で失敗しました。取得・RSS生成・履歴保存は成功していますが、Pagesへのデプロイと公開URLの検証は初回有効化待ちです。Inoreaderへの実登録は未実施です。
 
 リポジトリに配置した後、まず `Probe X connectivity` を手動実行してください。対象runnerからの結果、取得件数、最新投稿日時、エラーをSummaryに出します。その後 `Update X RSS` を実行し、公開RSSをInoreaderへ登録してください。
 

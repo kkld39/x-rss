@@ -14,7 +14,9 @@ https://syndication.twitter.com/srv/timeline-profile/screen-name/Mazda_PR
 
 HTML中の `__NEXT_DATA__` → `props.pageProps.timeline.entries[].content.tweet` を解析します。取得実測と検証範囲は [docs/verification.md](docs/verification.md) を参照してください。
 
-`kkld39/x-rss` に配置し、GitHub Actions上で自動テスト13件の成功を確認しました。2026-09-24 15:11 UTCのrunnerからの直接取得テストはHTTP 429でした。連続リトライはしていません。初期履歴として、同日14:39 UTCにXから直接取得できた20件を保存しています。デフォルト設定のRSSは11件で、これは過去の実取得データです。最新の取得状態はトップページとActionsのSummaryで確認してください。
+`kkld39/x-rss` に配置し、GitHub Actions上で自動テスト13件の成功を確認しました。2026-09-24 15:11 UTCの直接取得テストはHTTP 429でしたが、Xが示したリセット時刻を過ぎた15:16 UTCの生成Workflowでは、認証・Cookieなしで20件の取得、11件のRSS生成、履歴のcommitに成功しました。初期履歴は同日14:39 UTCの実取得レスポンスから保存したもので、その後runnerからの取得成功で更新しています。
+
+公開先は `https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml` です。現時点ではPagesの初回有効化が必要で、生成Workflowの公開部分はその設定待ちです。Settings → Pages → Sourceを **GitHub Actions** にすると公開を進められます。
 
 これは非公式エンドポイントです。将来、認証要求・仕様変更・IP制限などで動作しなくなる可能性があります。最近の全投稿を取得できる保証もありません。Syndicationが返す件数・順序・本文の長さはX次第で、長文やリポストが省略される場合があります。返されない返信・リポストは設定を有効にしても取得できません。guest token / GraphQLは、今回Syndicationで実データが取得できたため使用していません。
 
