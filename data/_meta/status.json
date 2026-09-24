@@ -1,12 +1,12 @@
 {
   "mazda_pr": {
-    "last_attempt": "2026-09-24T19:28:05.864469+00:00",
+    "last_attempt": "2026-09-24T22:41:59.443088+00:00",
     "ok": false,
     "new_count": 0,
     "last_success": "2026-09-24T15:16:31.848208+00:00",
     "fetched_count": 20,
     "saved_count": 20,
     "feed_count": 11,
-    "error": "FetchError: HTTP 429 アクセス制限 (reset Unix秒=1790278335, Retry-After=不明); 次回実行を待ちます"
+    "error": "FetchError: HTTP 429 アクセス制限 (reset Unix秒=1790290127, Retry-After=不明); 次回実行を待ちます"
   }
 }
