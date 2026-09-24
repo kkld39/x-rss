@@ -14,7 +14,7 @@ https://syndication.twitter.com/srv/timeline-profile/screen-name/Mazda_PR
 
 HTML中の `__NEXT_DATA__` → `props.pageProps.timeline.entries[].content.tweet` を解析します。取得実測と検証範囲は [docs/verification.md](docs/verification.md) を参照してください。
 
-**この作業時点ではGitHub-hosted runnerからの実測とPagesへの公開は未実施です。** 手元での成功はGitHubのIPでの成功を保証しません。初期セットアップ時に下記の `Probe X connectivity` を実行してください。成功したように見せるデモデータや架空のAPIへのフォールバックはありません。
+`kkld39/x-rss` に配置し、GitHub Actions上で自動テスト13件の成功を確認しました。2026-09-24 15:11 UTCのrunnerからの直接取得テストはHTTP 429でした。連続リトライはしていません。初期履歴として、同日14:39 UTCにXから直接取得できた20件を保存しています。デフォルト設定のRSSは11件で、これは過去の実取得データです。最新の取得状態はトップページとActionsのSummaryで確認してください。
 
 これは非公式エンドポイントです。将来、認証要求・仕様変更・IP制限などで動作しなくなる可能性があります。最近の全投稿を取得できる保証もありません。Syndicationが返す件数・順序・本文の長さはX次第で、長文やリポストが省略される場合があります。返されない返信・リポストは設定を有効にしても取得できません。guest token / GraphQLは、今回Syndicationで実データが取得できたため使用していません。
 
@@ -78,7 +78,7 @@ RSSには本文、UTCの投稿日時、元投稿URL、投稿IDに基づく固定
 
 ## 実行タイミングと手動実行
 
-`Update X RSS` は `7,37 * * * *`、つまり毎時7分・37分（UTC基準）に実行します。日本時間でも毎時7分・37分です。
+`Update X RSS` は `7,37 * * * *`、つまり毎時7分・37分（UTC基準）に実行します。日本時間でも毎時7分・37分です。`main` の `accounts.yml` または生成Workflowを変更した場合も実行します。`Probe X connectivity` は手動のほか、`main` の取得モジュール・接続確認Workflowを変更した場合に実行します。別のデフォルトブランチで使う場合は、両Workflowの `push.branches` も変更してください。
 
 手動では **Actions → Update X RSS → Run workflow → デフォルトブランチ → Run workflow** を選びます。接続だけを試す場合は **Probe X connectivity** を選んでください。
 
@@ -111,6 +111,7 @@ tests/test_system.py               取得解析・RSS・履歴保護のテスト
 - 成功・新規取得件数・失敗理由はログとActionsのSummaryで確認できます。「新規」はフィルター前の未保存ID数です。
 - 全件失敗時も既存フィードと失敗情報を公開してからWorkflowをfailureにします。公開済みRSSを空にしません。設定不正など実行全体の異常時は公開処理自体を行いません。
 - 履歴のpushに失敗した場合はPages公開を止めます。同時実行は直列化し、別のcommitと競合したときは強制pushせず失敗します。次回実行で最新の履歴から再開します。
+- Pagesが未設定でも取得と履歴保存を先に行います。Pages設定の確認は保存後です。標準の公開URLはリポジトリ名から組み立て、独自ドメインは `site_url` に指定します。
 
 最終取得成功日時は「その時刻にXがデータを返した」ことを表します。最新投稿まで揃っているという意味ではありません。X側のキャッシュや固定投稿などにより、古い投稿だけが返ることもあります。
 

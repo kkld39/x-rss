@@ -48,7 +48,13 @@ Cookie、Authorization、Xアカウントのログインは使用していませ
 
 ## GitHub Actions / Pages / Inoreader
 
-この作業では、公開先GitHubリポジトリが指定されていないため、GitHub-hosted runner上の実行、Pagesへのデプロイ、Inoreaderへの実登録は未実施です。
+配置先は [kkld39/x-rss](https://github.com/kkld39/x-rss) です。[GitHub Actions上のTests](https://github.com/kkld39/x-rss/actions/runs/36018109707) が成功しました。
+
+[2026-09-24 15:11 UTCのProbe](https://github.com/kkld39/x-rss/actions/runs/36018231564) はUbuntu 24.04 / Python 3.12.14のGitHub-hosted runner（Azure centralus）から実行し、XからHTTP 429が返りました。Xが返したリセット時刻はUnix秒 `1790262958` です。即時再試行はしていません。
+
+同日14:39 UTCの実取得レスポンスを初期履歴として `data/Mazda_PR.json` に20件保存し、`https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml` 用のRSSを11件生成しました。最終取得成功日時は元の取得時刻を保持し、最新試行は上記Probeの失敗として別に記録しています。初期履歴を最新取得成功のようには扱っていません。
+
+PagesへのデプロイとInoreaderへの実登録の確認は、以下に追記します。
 
 リポジトリに配置した後、まず `Probe X connectivity` を手動実行してください。対象runnerからの結果、取得件数、最新投稿日時、エラーをSummaryに出します。その後 `Update X RSS` を実行し、公開RSSをInoreaderへ登録してください。
 

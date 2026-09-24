@@ -1,0 +1,12 @@
+{
+  "mazda_pr": {
+    "last_attempt": "2026-09-24T15:11:01.093071+00:00",
+    "ok": false,
+    "new_count": 0,
+    "last_success": "2026-09-24T14:39:05+00:00",
+    "fetched_count": 20,
+    "saved_count": 20,
+    "feed_count": 11,
+    "error": "GitHub Actions接続テスト: HTTP 429 (reset Unix秒=1790262958)。初期履歴は2026-09-24 14:39:05 UTCにXから直接取得した20件です。"
+  }
+}
