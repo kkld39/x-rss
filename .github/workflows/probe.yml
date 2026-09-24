@@ -1,6 +1,11 @@
 name: Probe X connectivity
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/probe.yml'
+      - 'xrss/source.py'
 permissions:
   contents: read
 jobs:
