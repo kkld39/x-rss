@@ -6,10 +6,10 @@ An empty upstream response is ambiguous and MUST NOT count as a success.
 import html
 from html.parser import HTMLParser
 import json
-import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .model import HANDLE, Post, timestamp
@@ -18,7 +18,38 @@ ENDPOINT = "https://syndication.twitter.com/srv/timeline-profile/screen-name/"
 
 
 class FetchError(RuntimeError):
-    pass
+    def __init__(self, message, *, transient=False, diagnostics=None):
+        super().__init__(message)
+        self.transient = transient
+        self.diagnostics = diagnostics or {}
+
+
+def response_details(status, headers, now=None):
+    """Keep only diagnostic headers, never cookies or authentication data."""
+    now = now or datetime.now(timezone.utc)
+    result = {"http_status": status, "observed_at": now.isoformat()}
+    for header in ("date", "retry-after", "x-rate-limit-limit", "x-rate-limit-remaining",
+                   "x-rate-limit-reset", "x-transaction-id", "cf-ray"):
+        value = headers.get(header)
+        if value is not None:
+            result[header.replace("-", "_")] = str(value)[:256]
+    try:
+        result["reset_at"] = datetime.fromtimestamp(int(headers.get("x-rate-limit-reset")), timezone.utc).isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        pass
+    retry = headers.get("retry-after")
+    if retry is not None:
+        try:
+            from datetime import timedelta
+            retry_at = now + timedelta(seconds=max(0, int(retry)))
+        except (ValueError, OverflowError):
+            try:
+                retry_at = parsedate_to_datetime(retry)
+            except (TypeError, ValueError, OverflowError):
+                retry_at = None
+        if retry_at is not None and retry_at.tzinfo is not None:
+            result["retry_at"] = retry_at.astimezone(timezone.utc).isoformat()
+    return result
 
 
 class Source(Protocol):
@@ -111,44 +142,37 @@ def parse_timeline(document: str, handle: str) -> list[Post]:
 
 class DirectOnlyRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        target = urlparse(newurl)
-        if target.scheme != "https" or target.hostname != "syndication.twitter.com":
-            raise FetchError("想定外のリダイレクトを拒否しました")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        # Even an in-domain redirect would cause a second request.
+        return None
 
 
 class SyndicationSource:
-    def __init__(self, timeout=25, attempts=3, opener=None, sleep=time.sleep):
+    def __init__(self, timeout=25, opener=None):
         self.timeout = timeout
-        self.attempts = attempts
         self.opener = opener or build_opener(DirectOnlyRedirect())
-        self.sleep = sleep
+        self.last_response = {}
 
     def fetch(self, handle: str) -> list[Post]:
+        self.last_response = {}
         if not HANDLE.fullmatch(handle):
             raise FetchError("不正なアカウント名")
         request = Request(ENDPOINT + handle, headers={
             "User-Agent": "Mozilla/5.0 (compatible; X-RSS/1.0)",
             "Accept": "text/html", "Accept-Language": "ja,en;q=0.8",
         })
-        for attempt in range(self.attempts):
-            try:
-                with self.opener.open(request, timeout=self.timeout) as response:
-                    content = response.read(8 * 1024 * 1024 + 1)
-                    if len(content) > 8 * 1024 * 1024:
-                        raise FetchError("応答サイズが8MiBを超えました")
-                    return parse_timeline(content.decode("utf-8"), handle)
-            except HTTPError as exc:
-                detail = f"HTTP {exc.code}"
-                if exc.code == 429:
-                    reset = exc.headers.get("x-rate-limit-reset", "不明")
-                    retry = exc.headers.get("Retry-After", "不明")
-                    detail += f" アクセス制限 (reset Unix秒={reset}, Retry-After={retry}); 次回実行を待ちます"
-                exc.close()
-                if exc.code < 500 or attempt == self.attempts - 1:
-                    raise FetchError(detail) from exc
-            except (URLError, TimeoutError, OSError, UnicodeError) as exc:
-                if attempt == self.attempts - 1:
-                    raise FetchError(f"通信失敗: {exc}") from exc
-            self.sleep(2 ** (attempt + 1))
-        raise FetchError("取得を完了できませんでした")
+        try:
+            with self.opener.open(request, timeout=self.timeout) as response:
+                self.last_response = response_details(response.status, response.headers)
+                content = response.read(8 * 1024 * 1024 + 1)
+                if len(content) > 8 * 1024 * 1024:
+                    raise FetchError("応答サイズが8MiBを超えました")
+                return parse_timeline(content.decode("utf-8"), handle)
+        except HTTPError as exc:
+            self.last_response = response_details(exc.code, exc.headers)
+            detail = f"HTTP {exc.code} (reset={self.last_response.get('reset_at', '不明')}, "
+            detail += f"Retry-After={self.last_response.get('retry_after', '不明')})"
+            exc.close()
+            raise FetchError(detail, transient=exc.code in (408, 425, 429) or 500 <= exc.code <= 599,
+                             diagnostics=self.last_response) from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise FetchError(f"通信失敗: {exc}", transient=True, diagnostics=self.last_response) from exc

@@ -1,15 +1,17 @@
 name: Probe X connectivity
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/probe.yml'
-      - 'xrss/source.py'
+    inputs:
+      confirm_network:
+        description: 'Xへ追加アクセスします。通常運用では実行不要です。'
+        required: true
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
   probe:
+    if: inputs.confirm_network
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -13,7 +13,8 @@ from xrss.app import run
 from xrss.config import Config, load_config
 from xrss.model import Post
 from xrss.render import DC, rss
-from xrss.source import FetchError, SyndicationSource, parse_timeline
+from xrss.source import DirectOnlyRedirect, FetchError, SyndicationSource, parse_timeline, response_details
+from xrss.runtime import publish_cached
 from xrss.storage import json_bytes, load_posts, merge_posts
 
 NOW = "2026-09-24T14:39:05+00:00"
@@ -87,20 +88,19 @@ class ParserTests(unittest.TestCase):
                           {"x-rate-limit-reset": "1234"}, io.BytesIO(b"Rate limit exceeded"))
         with patch("xrss.source.build_opener") as make:
             make.return_value.open.side_effect = error
-            sleep = unittest.mock.Mock()
-            with self.assertRaisesRegex(FetchError, "1234"):
-                SyndicationSource(sleep=sleep).fetch("Mazda_PR")
-            sleep.assert_not_called()
+            with self.assertRaises(FetchError) as caught:
+                SyndicationSource().fetch("Mazda_PR")
+            self.assertTrue(caught.exception.transient)
+            self.assertEqual(caught.exception.diagnostics["x_rate_limit_reset"], "1234")
             self.assertEqual(make.return_value.open.call_count, 1)
 
-    def test_transient_network_error_retries_then_succeeds_without_cookie(self):
-        response = io.BytesIO(document([tweet()]).encode())
+    def test_transient_network_error_is_never_retried(self):
         with patch("xrss.source.build_opener") as make:
-            make.return_value.open.side_effect = [URLError("timeout"), response]
-            sleep = unittest.mock.Mock()
-            posts = SyndicationSource(sleep=sleep).fetch("Mazda_PR")
-            self.assertEqual(len(posts), 1)
-            sleep.assert_called_once_with(2)
+            make.return_value.open.side_effect = URLError("timeout")
+            with self.assertRaises(FetchError) as caught:
+                SyndicationSource().fetch("Mazda_PR")
+            self.assertTrue(caught.exception.transient)
+            self.assertEqual(make.return_value.open.call_count, 1)
             request = make.return_value.open.call_args.args[0]
             self.assertFalse(request.has_header("Cookie"))
             self.assertFalse(request.has_header("Authorization"))
@@ -140,6 +140,10 @@ class StorageTests(unittest.TestCase):
 
 class RunnerTests(unittest.TestCase):
     def setUp(self):
+        # Expected failures in tests must not emit production Actions annotations.
+        environment = patch.dict(os.environ, {"GITHUB_ACTIONS": ""})
+        environment.start()
+        self.addCleanup(environment.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -157,7 +161,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_partial_failure_preserves_old_files_and_continues(self):
         history, feed = self.seed()
-        source = FakeSource({"Mazda_PR": FetchError("HTTP 429"), "Other": [post("123", author="Other")]})
+        source = FakeSource({"Mazda_PR": FetchError("HTTP 429", transient=True, diagnostics={"http_status": 429}), "Other": [post("123", author="Other")]})
         self.assertEqual(self.run_app(Config(["Mazda_PR", "Other"]), source), 0)
         self.assertEqual(source.calls, ["Mazda_PR", "Other"])
         self.assertEqual((self.data / "Mazda_PR.json").read_bytes(), history)

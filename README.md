@@ -1,49 +1,34 @@
 # X → RSS / GitHub Actions + Pages
 
-公開XアカウントのタイムラインをXのSyndicationサービスから直接取得し、アカウント別のRSS 2.0をGitHub Pagesで公開するPythonアプリです。Inoreaderへの登録を想定しています。
+公開Xアカウントの投稿をXへ直接アクセスして取得し、RSS 2.0として公開します。Python＋PyYAMLのみを使用し、Xへのログイン・Cookie・有料API・Nitter・XCancelには依存しません。
 
-**Xへのログイン、Cookie、APIキー、有料API、Nitter、XCancel、外部RSSサービスは使用しません。** 依存ライブラリは設定ファイル用のPyYAMLのみです。
+- Pages: https://kkld39.github.io/x-rss/
+- Mazda_PRのInoreader登録URL: https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml
+- [取得ログの調査と代替方式の検証](docs/operations-audit.md)
 
-## 動作確認と制約
+## 通常運用
 
-2026-09-24に、以下の実在するエンドポイントから、Cookie・認証ヘッダーなしで `Mazda_PR` の20件の投稿を取得できました。最初はHTTP 429で、後にHTTP 200になりました。Xのアクセス制限により、常に成功するわけではありません。
+| 項目 | 動作 |
+| --- | --- |
+| 定期実行 | 毎時37分（`37 * * * *`）。UTCでも日本時間でも37分 |
+| Xへのアクセス | 1アカウントにつき1回のGET。再試行・リダイレクト追従・追加の投稿単体取得なし |
+| 取得待機中 | 保存された待機時刻より前なら0リクエスト |
+| 手動取得 | Actions → Update X RSS → Run workflow。通常の待機制御を尊重 |
+| push時 | テストと保存済みRSSのPages公開のみ。Xにはアクセスしない |
+| Probe | 手動診断専用。明示的な確認チェックが必要。通常運用では使用不要 |
+| 429・一時的な障害 | 有効な保存済みJSONとRSSがあれば警告で正常終了し、そのまま配信 |
+| 要対応の障害 | コード異常、JSON/RSS破損、生成失敗、403/404、応答形式変更、履歴のpush失敗、Pages公開失敗などはFailure |
 
-```text
-https://syndication.twitter.com/srv/timeline-profile/screen-name/Mazda_PR
-```
+GitHubのスケジュールは遅延・取りこぼしがあり、厳密な毎時実行ではありません。[scheduleの仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)では、Publicリポジトリの活動が60日ない場合の無効化にも注意が必要です。
 
-HTML中の `__NEXT_DATA__` → `props.pageProps.timeline.entries[].content.tweet` を解析します。取得実測と検証範囲は [docs/verification.md](docs/verification.md) を参照してください。
+## アカウントを追加・削除する
 
-`kkld39/x-rss` に配置し、GitHub Actions上で自動テスト13件の成功を確認しました。2026-09-24 15:11 UTCの直接取得テストはHTTP 429でしたが、Xが示したリセット時刻を過ぎた15:16 UTCの生成Workflowでは、認証・Cookieなしで20件の取得、11件のRSS生成、履歴のcommitに成功しました。初期履歴は同日14:39 UTCの実取得レスポンスから保存したもので、その後runnerからの取得成功で更新しています。
-
-公開先は `https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml` です。現時点ではPagesの初回有効化が必要で、生成Workflowの公開部分はその設定待ちです。Settings → Pages → Sourceを **GitHub Actions** にすると公開を進められます。
-
-これは非公式エンドポイントです。将来、認証要求・仕様変更・IP制限などで動作しなくなる可能性があります。最近の全投稿を取得できる保証もありません。Syndicationが返す件数・順序・本文の長さはX次第で、長文やリポストが省略される場合があります。返されない返信・リポストは設定を有効にしても取得できません。guest token / GraphQLは、今回Syndicationで実データが取得できたため使用していません。
-
-## 初期セットアップ
-
-1. GitHubで **Publicリポジトリ** を作り、このフォルダーのファイルをアップロードまたはpushします。`.github/workflows/` も含めてください。既存リポジトリをforkする場合は、ActionsタブでWorkflowを有効にします。
-2. `accounts.yml` を編集し、監視したい公開アカウントを登録します。
-3. リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にします。
-4. **Settings → Actions → General** でGitHub公式Actionsが許可されていることを確認します。Workflowがデフォルトブランチへ履歴をcommit・pushできる必要があります。このWorkflowは `contents: write` を明示しています。組織の制限やブランチ保護がpushを拒否する場合は、専用リポジトリなどで書き込みを許可してください。
-5. **Actions → Probe X connectivity → Run workflow** を選択して接続を確認します。Pagesの設定なしでも実行でき、履歴は変更しません。
-6. **Actions → Update X RSS → Run workflow** を、**デフォルトブランチ** を選んで実行します。成功すると `data/` と `public/` がリポジトリにcommitされ、Pagesに公開されます。
-7. Workflow内の `Deploy Pages` または **Settings → Pages** から公開URLを確認します。
-
-個別のPersonal Access TokenやX関連のSecretsは不要です。自動発行の `GITHUB_TOKEN` とPages用OIDCを利用します。独自ドメインを使わなければ `site_url` の設定も不要です。
-
-### 無料範囲
-
-GitHub Freeで利用する場合は **Publicリポジトリ＋標準の `ubuntu-latest` runner** を前提とします。[標準runnerのPublicリポジトリでの実行は無料](https://docs.github.com/en/actions/concepts/billing-and-usage)で、[GitHub PagesもPublicリポジトリで利用可能](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)です。Privateリポジトリや有料の大型runnerを選ばないでください。
-
-保存する投稿数は各アカウント最大300件（変更可）です。画像はダウンロードせず、RSS内でXの画像URLを参照します。Pages artifactの保持は1日です。Pagesの容量・転送量やリポジトリ全体の容量には上限があるため、対象を極端に増やさず利用してください。JSONの件数上限はgitの過去commitの容量までは制限しません。
-
-## 監視アカウント・表示設定
+[accounts.yml](accounts.yml) の `accounts:` に、ユーザー名を1行ずつ追加してcommitします。Pythonの編集は不要です。
 
 ```yaml
 accounts:
   - Mazda_PR
-  # - 実在する別アカウントのユーザー名
+  # 次の行に「  - 実在するユーザー名」を追加（@やURLは不要）
 
 include_reposts: false
 include_replies: false
@@ -51,111 +36,125 @@ max_posts: 300
 site_url: ""
 ```
 
-`accounts` に行を追加・削除してcommitすれば、次の実行から反映されます。`@`、URL、日本語の表示名は入れず、Xのユーザー名を指定してください。サンプルの `example_account` は実在確認していないため初期設定には入れていません。
+追加したアカウントの取得は次の定期実行、または明示した手動実行で始まります。設定をpushしただけではXへアクセスしません。初回成功後に `feeds/ユーザー名.xml` ができます。
 
-| 設定 | 既定値 | 内容 |
-| --- | --- | --- |
-| `include_reposts` | `false` | `true` でリポストもRSSに含める |
-| `include_replies` | `false` | `true` で返信もRSSに含める |
-| `max_posts` | `300` | アカウントごとの履歴上限。200〜500 |
-| `site_url` | 空文字 | PagesのサイトURLを自動取得。独自ドメインなどの場合のみ指定 |
+- 通常投稿・引用ポストを既定で含め、返信・リポストを除外します。
+- `include_reposts` / `include_replies` を `true` にすると、その種別もRSSに含めます。
+- 履歴にはフィルター前の投稿を保存します。設定変更は次の取得成功時に履歴全体へ適用します。一時失敗中は既存RSSのバイト列を維持します。
+- `max_posts` は200〜500。既定300件で、返信・リポストも含む履歴の合計件数です。
+- URLの大文字・小文字は区別されるので、設定した表記を使って購読してください。
+- アカウントを削除すると取得とトップページ掲載を停止します。保存済みJSON・XMLの自動削除はしません。公開も停止したい場合は該当JSONと `public/feeds/対象.xml` を削除してcommitしてください。
 
-通常投稿と引用ポストはデフォルトで含めます。引用元URLが取れる場合はリンクを付けます。リポストは構造化データを優先し、投稿者と監視対象の不一致・`RT @` 表記も手がかりにします。後者はXの返すデータによって誤判別する可能性があります。返信は返信先フィールドと会話IDで判別します。
+## 429時の動作
 
-履歴にはフィルター前の投稿を保存し、RSS生成時にフィルターを適用します。このため `true` に切り替えると、保存済みの返信・リポストも次の**取得成功時**に表示できます。失敗時はRSSをそのまま維持するため、設定変更も成功まで反映されません。履歴上限は通常投稿・引用・返信・リポストの合計です。
+1. その実行では再試行しません。5xxや通信タイムアウトも再試行しません。
+2. 既存の投稿JSONとRSSを変更せず、診断情報とトップページのみ更新します。
+3. キャッシュが有効ならアプリは終了コード0。Job SummaryとActionsのWarning注記で取得失敗を知らせます。全アカウントが429でも同じ扱いです。
+4. 待機時刻をリポジトリに保存します。一時失敗から1時間後、Xの `x-rate-limit-reset`、`Retry-After` のうち最も遅い時刻までは、次回の手動・定期実行でもXへのアクセスを省略します。日付形式と秒数形式のRetry-Afterに対応します。
+5. reset時刻と次回アクセス可能時刻を、トップページに日本時間で表示します。HTTPステータス・生のreset値・Retry-Afterなどの詳細は折りたたみ表示です。
 
-アカウントを削除すると取得とトップページへの掲載を停止します。誤削除を防ぐため、保存済みJSONとRSSは自動削除しません。公開も停止したい場合は `data/対象.json` と `public/feeds/対象.xml` を手動で削除してcommitし、Workflowを実行してください。URLの大文字・小文字は区別されるため、設定した表記のRSS URLを登録してください。
+resetはXが提示した時刻であり、その時刻に制限が解除される保証ではありません。数時間空けても失敗する実測があり、共有IP帯などによる制限の可能性があります。原因は断定していません。
 
-## Inoreaderに登録
+初回取得で429となり、配信可能な保存済みJSON・RSSがない場合はFailureにします。配信できるものがない状態を成功として隠さないためです。429以外でも、コード・データ・RSSの異常は一時的なアクセス制限と区別してFailureにします。複数アカウントの処理は継続し、1件でも要対応エラーがあれば最終的にFailureです。
 
-公開サイトの「RSSを購読」リンクのURLをコピーして、Inoreaderの購読追加で貼り付けます。
+## トップページとRSS
 
-```text
-https://USERNAME.github.io/REPOSITORY/feeds/Mazda_PR.xml
-```
+スマートフォンで横スクロールせず読めるカード表示です。各カードにはRSSリンク、取得状態、最終取得成功、最終アクセス、取得件数を表示します。長いエラー文は「詳細を表示」で開けます。
 
-`USERNAME` と `REPOSITORY` を実際の値に置き換えてください。`USERNAME.github.io` というユーザーサイト用リポジトリでは `REPOSITORY/` が付きません。正確なURLはトップページのRSSリンクで確認できます。
+RSSには以下を含めます。
 
-RSSには本文、UTCの投稿日時、元投稿URL、投稿IDに基づく固定GUID、`dc:creator` による投稿者名、取得できた画像を含めます。RSSの `author` はメールアドレスを要求するため使用していません。文字はXML/HTMLとしてエスケープし、外部スクリプトを挿入しません。画像の表示はInoreaderの画像設定やX側の配信状況にも依存します。
+- 本文、元投稿URL、RFC 822形式のUTC投稿日時
+- 投稿IDを使う安定したGUID（同じ投稿を重複登録しない）
+- Dublin Coreの `dc:creator` による投稿者名
+- 取得できた画像のHTML表示と引用元URL
 
-## 実行タイミングと手動実行
+RSSの `author` はメールアドレスを要求するため使用せず、`dc:creator` を使います。XML/HTMLをエスケープし、不正なXML制御文字を除去します。画像は保存せずXの画像配信URLを参照します。新規生成RSSの `ttl` は60分です。失敗中の既存RSSにあるttlなどは保護のため書き換えません。
 
-`Update X RSS` は `7,37 * * * *`、つまり毎時7分・37分（UTC基準）に実行します。日本時間でも毎時7分・37分です。`main` の `accounts.yml` または生成Workflowを変更した場合も実行します。`Probe X connectivity` は手動のほか、`main` の取得モジュール・接続確認Workflowを変更した場合に実行します。別のデフォルトブランチで使う場合は、両Workflowの `push.branches` も変更してください。
+Inoreaderの購読追加に上記XML URLを貼り付けてください。HTTP 200・`application/xml` での外部取得と、GUID・日時・投稿者・本文を含むRSS 2.0の構造を確認しています。Inoreaderアカウント内部での実登録操作は行っていません。Inoreader側の更新頻度は同サービスの設定に従います。
 
-手動では **Actions → Update X RSS → Run workflow → デフォルトブランチ → Run workflow** を選びます。接続だけを試す場合は **Probe X connectivity** を選んでください。
+## Workflowの役割
 
-GitHubのスケジュール実行には遅延や取りこぼしがあり、厳密な30分周期を保証しません。また、Publicリポジトリのスケジュールは60日間活動がない場合に無効化されることがあります。停止した場合はActions画面で再有効化してください。[GitHubのschedule仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+- **Update X RSS**: 毎時37分と手動実行のみ。X取得 → マージ → RSS生成 → 履歴commit → Pages公開。取得時の警告は正常終了、要対応エラーは公開可能な状態を保持したうえで最後にFailureにします。
+- **Publish saved RSS (no X access)**: コード・設定・公開ファイルのpushと手動実行。保存済みRSSと状態を読み、トップページを再構築してPagesへ公開します。Xには接続せず、投稿JSON、RSS、最終取得成功時刻を書き換えません。
+- **Tests**: ネット接続なしのテストと設定検証。Xには接続しません。
+- **Probe X connectivity**: 手動で追加アクセスを明示したときだけ動く診断用です。通常運用で実行する必要はありません。独立診断なので通常Workflowの永続待機制御を使わず、アカウントごとに1リクエスト発生します。
 
-## 保存・エラー時の動作
+コードの修正確認やデザイン変更で `Update X RSS` / Probe を手動実行しないでください。公開の更新だけなら `Publish saved RSS (no X access)` を使用します。
 
-```text
-accounts.yml                       監視対象・フィルター設定
-xrss/source.py                     取得処理（差し替え箇所）
-xrss/model.py                      取得元に依存しないPost形式
-xrss/storage.py                    原子的なファイル置換・IDマージ
-xrss/render.py                     RSSとトップページ
-xrss/app.py                        アカウント別処理・ログ・終了コード
-xrss/probe.py                      認証不要の実接続確認
-data/Mazda_PR.json                 投稿履歴（初回成功時に生成）
-data/_meta/status.json                   最終試行・最終成功・失敗理由
-public/feeds/Mazda_PR.xml          RSS（初回成功時に生成）
-public/index.html                  状況ページ
-.github/workflows/update-feeds.yml 定期取得・履歴commit・公開
-.github/workflows/probe.yml        手動の実接続テスト
-.github/workflows/test.yml         ネット接続なしの自動テスト
-tests/test_system.py               取得解析・RSS・履歴保護のテスト
-```
+取得Workflowと公開専用Workflowは同じconcurrencyグループで直列化します。強制pushは行わず、リポジトリ更新との競合はFailureにして次回に回します。履歴保存に失敗した場合、Pagesだけを先に公開しません。
 
-- 投稿IDで重複排除し、同じIDの内容は新しい取得結果で更新。投稿日時順に保持します。Xから返らなくなった投稿も上限内なら残ります。
-- 1アカウントのエラー後も残りを処理します。失敗したアカウントの既存JSON・RSSは取得結果で上書きしません。履歴JSONが破損していても空に初期化しません。
-- HTTP 200でも空タイムライン・解析不能は失敗です。投稿のない新規アカウントも保守的に失敗扱いになります。初回失敗時は空のRSSを作らず「初回取得待ち」と表示します。
-- HTTP 429は即時再試行せず、リセット時刻をログに表示して次回実行を待ちます。タイムアウト・5xxは短いバックオフで最大3回試行します。
-- 成功・新規取得件数・失敗理由はログとActionsのSummaryで確認できます。「新規」はフィルター前の未保存ID数です。
-- 全件失敗時も既存フィードと失敗情報を公開してからWorkflowをfailureにします。公開済みRSSを空にしません。設定不正など実行全体の異常時は公開処理自体を行いません。
-- 履歴のpushに失敗した場合はPages公開を止めます。同時実行は直列化し、別のcommitと競合したときは強制pushせず失敗します。次回実行で最新の履歴から再開します。
-- Pagesが未設定でも取得と履歴保存を先に行います。Pages設定の確認は保存後です。標準の公開URLはリポジトリ名から組み立て、独自ドメインは `site_url` に指定します。
+## 診断情報
 
-最終取得成功日時は「その時刻にXがデータを返した」ことを表します。最新投稿まで揃っているという意味ではありません。X側のキャッシュや固定投稿などにより、古い投稿だけが返ることもあります。
+`data/_meta/status.json` は現在の状態、`data/_meta/requests/ユーザー名.json` は直近120回の実行・スキップ履歴です。
 
-## ローカル実行
+記録するのは試行日時、リクエスト数、結果、HTTPステータス、サーバー日時、rate-limit値、reset日時、Retry-After、Xのtransaction ID / CF-Ray、Actions run IDです。Cookie・認証情報・生のレスポンス本文は記録しません。ヘッダーがない項目は未通知として扱います。
 
-Python 3.10以上（Actionsでは3.12）で実行します。
+既存の過去ログには、当時記録していたHTTPステータスとresetしかありません。改修前の未記録ヘッダーを推測で補完しません。過去の取得成功時刻は上書きせず、取得失敗が続いていることをトップページから確認できます。
+
+## 無料で使うための初期セットアップ
+
+このリポジトリは設定済みです。別のリポジトリへコピーする場合:
+
+1. **Publicリポジトリ** を作り、`.github/workflows/` も含めて配置します。
+2. `accounts.yml` を設定します。
+3. **Settings → Pages → Build and deployment → Source → GitHub Actions** にします。
+4. GitHub公式Actionsを許可し、取得Workflowの `contents: write` による履歴commitが許されるようにします。ブランチ保護・組織ポリシーで拒否される場合は、専用リポジトリ等で適切な書き込み権限を設定します。
+5. **Actions → Update X RSS → Run workflow** をデフォルトブランチで1回実行します。
+6. PagesのトップページからRSSリンクを確認してInoreaderに登録します。
+
+個別のPATやX関連のSecretsは不要です。自動のGITHUB_TOKENとPages用OIDCを利用します。標準URLはリポジトリ名から組み立てます。独自ドメインは `site_url` に指定してください。`main` 以外で運用する場合は公開専用Workflowの `push.branches` を変更します。
+
+[Publicリポジトリの標準runnerは無料](https://docs.github.com/en/actions/concepts/billing-and-usage)です。[Pagesの容量・転送量などの上限](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)は適用されます。有料の大型runnerやPrivateリポジトリを前提としていません。artifactの保持は1日です。現在のJSON件数上限はgitの過去commit容量までは制限しません。
+
+## ローカル検証
+
+Python 3.10以上（Actionsは3.12）。依存ライブラリはPyYAMLのみです。
 
 ```bash
 python -m venv .venv
 # macOS/Linux: source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
+# PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-python -m xrss.probe
-python -m xrss.app --site-url https://USERNAME.github.io/REPOSITORY
 python -m unittest discover -s tests -v
+
+# Xに接続しない公開確認
+python -m xrss.app --publish-only
+python -m http.server 8000 --directory public
+
+# 明示的にXへ接続する場合のみ
+python -m xrss.app --site-url https://USERNAME.github.io/REPOSITORY
 ```
 
-ローカルの試行を本番データと分ける場合:
+終了コード0は「正常更新、または有効なキャッシュで一時障害を継続運用」、1はアカウントごとの要対応エラー、2は設定・実行全体の異常です。0が新着取得成功を意味するとは限りません。最終成功時刻も確認してください。
 
-```bash
-python -m xrss.app --data-dir _local/data --output _local/public --site-url http://localhost:8000
-python -m http.server 8000 --directory _local/public
+## ファイル構成
+
+```text
+accounts.yml                       対象と表示フィルター
+xrss/source.py                     差し替え可能な取得処理・HTTP診断
+xrss/runtime.py                    待機制御・警告/異常分類・保存処理
+xrss/app.py                        CLI（--publish-onlyは接続なし）
+xrss/model.py                      投稿データモデル
+xrss/storage.py                    IDマージ・原子的なファイル置換
+xrss/render.py                     RSSとモバイル対応トップページ
+data/ユーザー名.json                投稿履歴
+data/_meta/status.json             現在の取得状態
+data/_meta/requests/ユーザー名.json  直近120回の診断履歴
+public/feeds/ユーザー名.xml          公開RSS
+public/index.html                  状況ページ
+tests/                            ネット接続なしの自動テスト
+docs/operations-audit.md           失敗ログ分析・代替方式調査
 ```
 
-アプリの終了コードは、少なくとも1件成功なら `0`、全件取得失敗なら `1`、設定や実行全体の異常なら `2` です。テストは合成レスポンスを使用し、Xに接続しません。接続成功は `probe` で別途確認します。
+## トラブルシューティングと限界
 
-## トラブルシューティング
+- **数時間経っても429**: 短時間アクセスだけが原因とは限りません。手動再実行を繰り返さず、診断履歴と最終成功時刻を見てください。IP制限を回避するためのプロキシやrunner変更は実装していません。
+- **403/404、ログインページ、解析不能、空応答**: 非公開化・削除・Xの仕様変更等を確認してください。正常な空フィードとして上書きしません。
+- **RSSが404**: 初回取得とPages公開の成功を確認。パスは `public/feeds/` ではなく `feeds/` です。
+- **Git pushが拒否される**: 書き込み権限、ブランチ保護、同時commitを確認。自動で保護を解除しません。
+- **古い投稿や削除済み投稿が残る**: 履歴保持の仕様です。Xから返らなくても上限内なら保持します。
+- **投稿が抜ける**: 埋め込み用タイムラインの件数・順序・本文の長さはX次第です。全投稿の回収や、取得間隔内に流れた投稿の復元は保証しません。
+- **返信・リポスト判別**: 構造化データを優先し、会話ID・投稿者・RT表記も使用します。X側のデータ次第では誤判別がありえます。
+- **将来止まる可能性**: 非公式エンドポイントの継続提供・無認証利用・共有runnerからの到達性は保証されません。取得を減らす改修は成功率の保証ではありません。
 
-| 症状 | 確認・対応 |
-| --- | --- |
-| HTTP 429 | Xの制限です。連続して手動実行せず次回を待ちます。監視アカウント数を減らす、実行間隔を広げることも検討してください。 |
-| 403 / 404 / ログインページ | Xの制限、アカウントの削除・非公開化、エンドポイントの変更を確認します。手元で成功してもGitHubのIPだけ制限されることがあります。 |
-| `__NEXT_DATA__` がない / 構造を解釈できない | `xrss/source.py` の取得処理がXの新形式に追従する必要があります。既存履歴・RSSは保持されます。 |
-| 全件失敗 | Summaryを確認します。以前のRSSは引き続き配信されます。初回から失敗する環境では本方式で更新できません。 |
-| Pages設定の取得に失敗 | Settings → PagesのSourceをGitHub Actionsにし、Pagesの利用可否・Actions許可を確認します。 |
-| `git push` が拒否される | `contents: write`、組織ポリシー、ブランチ保護、同時に行われた手動commitを確認します。自動で保護を解除したり強制pushしたりはしません。 |
-| RSSが404 | 初回取得成功・Deploy Pages成功を確認。URLは `public/feeds/` ではなく `feeds/`。アカウント名の大文字小文字にも注意してください。 |
-| Inoreaderが更新しない | トップページの最終成功日時とRSS中の投稿日時を確認します。Inoreader側の取得間隔・キャッシュによる遅延もあります。 |
-| 一部の投稿がない | Xが返す最近の範囲とフィルターを確認。過去全件の復元や取得間隔内に流れた全投稿の回収はできません。 |
-| 古い投稿・削除済み投稿が残る | 履歴保持による仕様です。削除を反映するには履歴JSONの該当投稿を削除して再生成してください。Xが再度返せば復活します。 |
-| 設定したのに実行されない | 設定・Workflowがデフォルトブランチにあるか、forkのActionsが有効か、スケジュールが無効化されていないかを確認します。 |
-
-## 取得方式を差し替える
-
-`xrss/source.py` の `Source` インターフェースは `fetch(handle) -> list[Post]` です。別の取得元を実装し、`app.py` の `SyndicationSource()` を差し替えれば、JSON履歴・RSS・Pages処理を再利用できます。失敗は `FetchError` として報告し、空配列を成功として返さないでください。実際に利用可能と検証していないGraphQL IDやguest token向けAPIを固定値で追加しないでください。
+取得元は `Source.fetch(handle) -> list[Post]` で独立しています。未検証の内部APIや自動フォールバックは追加していません。代替方式は [調査記録](docs/operations-audit.md) を参照してください。

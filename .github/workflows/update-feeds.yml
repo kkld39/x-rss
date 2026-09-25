@@ -2,13 +2,8 @@ name: Update X RSS
 
 on:
   schedule:
-    - cron: '7,37 * * * *'
+    - cron: '37 * * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'accounts.yml'
-      - '.github/workflows/update-feeds.yml'
 
 concurrency:
   group: x-rss-pages
@@ -78,8 +73,8 @@ jobs:
         if: success() && steps.update.outputs.ready == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
-      - name: Fail workflow when fetching failed for every account
+      - name: Fail workflow only for actionable application errors
         if: always() && steps.update.outcome == 'failure'
         run: |
-          echo 'X retrieval failed. See Fetch X and build RSS and the job summary.'
+          echo 'Application, saved data or RSS generation needs attention. Temporary errors with valid cached RSS are warnings.'
           exit 1
