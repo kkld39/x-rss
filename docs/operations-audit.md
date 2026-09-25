@@ -62,3 +62,12 @@ Xへの再アクセスではなく、既存の全取得実行6件（うち定期
 公開URL: https://kkld39.github.io/x-rss/
 
 Inoreader登録URL: https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml
+
+## 本番反映後の確認
+
+- 改修commit: `3abd4ea5ba3f507e1f0e307522d5bfa72e1a97aa`。
+- [Tests](https://github.com/kkld39/x-rss/actions/runs/36091019001) と [X接続なしのPages公開](https://github.com/kkld39/x-rss/actions/runs/36091019064) が成功。Ubuntu/Python 3.12でも23テスト成功。公開ログにXへのリクエスト0件を確認。
+- このpushで取得Workflow・Probeは起動していない。
+- 2026-09-25 03:37:33 UTCに公開XMLを外部取得し、HTTP 200、`application/xml`、17,347 bytes、11項目を確認。改修前の公開RSSとバイト単位で一致した。
+- 公開ページも375px幅で確認。横方向のはみ出しはなく、購読リンクは `https://kkld39.github.io/x-rss/feeds/Mazda_PR.xml` に解決された。
+- 改修後の429処理はモックによる自動テストで検証。確認目的のSyndication再取得は行っていない。今後の通常実行で返るHTTP状態は診断履歴に保存される。
