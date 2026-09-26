@@ -23,18 +23,18 @@ class OperationsTests(unittest.TestCase):
     def test_all_429_are_warnings_with_exact_cache_preservation_and_cooldown(self):
         history, feed = self.seed()
         info = {"http_status": 429, "reset_at": "2026-09-24T17:00:00+00:00", "x_rate_limit_reset": "1790269200"}
-        source = FakeSource({"Mazda_PR": FetchError("HTTP 429", transient=True, diagnostics=info)})
-        self.assertEqual(self.run_app(Config(["Mazda_PR"]), source), 0)
-        self.assertEqual((self.data / "Mazda_PR.json").read_bytes(), history)
-        self.assertEqual((self.output / "feeds/Mazda_PR.xml").read_bytes(), feed)
-        state = json.loads((self.data / "_meta/status.json").read_text(encoding="utf-8"))["mazda_pr"]
+        source = FakeSource({"example_account": FetchError("HTTP 429", transient=True, diagnostics=info)})
+        self.assertEqual(self.run_app(Config(["example_account"]), source), 0)
+        self.assertEqual((self.data / "example_account.json").read_bytes(), history)
+        self.assertEqual((self.output / "feeds/example_account.xml").read_bytes(), feed)
+        state = json.loads((self.data / "_meta/status.json").read_text(encoding="utf-8"))["example_account"]
         self.assertEqual(state["health"], "warning")
         self.assertEqual(state["last_success"], NOW)
         self.assertEqual(state["next_request_at"], info["reset_at"])
-        source2 = FakeSource({"Mazda_PR": AssertionError("should never fetch during cooldown")})
-        self.assertEqual(self.run_app(Config(["Mazda_PR"]), source2), 0)
+        source2 = FakeSource({"example_account": AssertionError("should never fetch during cooldown")})
+        self.assertEqual(self.run_app(Config(["example_account"]), source2), 0)
         self.assertEqual(source2.calls, [])
-        events = json.loads((self.data / "_meta/requests/Mazda_PR.json").read_text(encoding="utf-8"))
+        events = json.loads((self.data / "_meta/requests/example_account.json").read_text(encoding="utf-8"))
         self.assertEqual(events[-1]["request_count"], 0)
         self.assertEqual(events[-2]["response"]["http_status"], 429)
         page = (self.output / "index.html").read_text(encoding="utf-8")
@@ -48,40 +48,40 @@ class OperationsTests(unittest.TestCase):
                                 (ValueError("bug"), 1)):
             with self.subTest(error=error):
                 self.seed()
-                result = self.run_app(Config(["Mazda_PR"]), FakeSource({"Mazda_PR": error}))
+                result = self.run_app(Config(["example_account"]), FakeSource({"example_account": error}))
                 self.assertEqual(result, expected)
                 # Clear cooldown for the next independent subcase.
                 (self.data / "_meta/status.json").unlink()
 
     def test_initial_429_without_cached_rss_needs_attention(self):
-        self.assertEqual(self.run_app(Config(["Mazda_PR"]), FakeSource({
-            "Mazda_PR": FetchError("HTTP 429", transient=True)})), 1)
-        self.assertFalse((self.output / "feeds/Mazda_PR.xml").exists())
+        self.assertEqual(self.run_app(Config(["example_account"]), FakeSource({
+            "example_account": FetchError("HTTP 429", transient=True)})), 1)
+        self.assertFalse((self.output / "feeds/example_account.xml").exists())
 
     def test_render_failure_is_failure_not_warning_and_preserves_files(self):
         history, feed = self.seed()
         with patch("xrss.runtime.rss", side_effect=ValueError("cannot render")):
-            result = self.run_app(Config(["Mazda_PR"]), FakeSource({"Mazda_PR": [post("123")]}))
+            result = self.run_app(Config(["example_account"]), FakeSource({"example_account": [post("123")]}))
         self.assertEqual(result, 1)
-        self.assertEqual((self.data / "Mazda_PR.json").read_bytes(), history)
-        self.assertEqual((self.output / "feeds/Mazda_PR.xml").read_bytes(), feed)
+        self.assertEqual((self.data / "example_account.json").read_bytes(), history)
+        self.assertEqual((self.output / "feeds/example_account.xml").read_bytes(), feed)
 
     def test_publish_only_never_fetches_or_changes_history_rss_or_success_time(self):
         history, feed = self.seed()
         state = (self.data / "_meta/status.json").read_bytes()
         with patch("xrss.source.SyndicationSource.fetch", side_effect=AssertionError("network forbidden")):
-            self.assertEqual(publish_cached(Config(["Mazda_PR"]), self.data, self.output), 0)
-        self.assertEqual((self.data / "Mazda_PR.json").read_bytes(), history)
-        self.assertEqual((self.output / "feeds/Mazda_PR.xml").read_bytes(), feed)
+            self.assertEqual(publish_cached(Config(["example_account"]), self.data, self.output), 0)
+        self.assertEqual((self.data / "example_account.json").read_bytes(), history)
+        self.assertEqual((self.output / "feeds/example_account.xml").read_bytes(), feed)
         self.assertEqual((self.data / "_meta/status.json").read_bytes(), state)
 
     def test_summary_warning_and_fatal_even_when_other_account_succeeds(self):
         self.seed()
-        source = FakeSource({"Mazda_PR": FetchError("429", transient=True), "Other": [post("123", author="Other")]})
+        source = FakeSource({"example_account": FetchError("429", transient=True), "Other": [post("123", author="Other")]})
         summary = self.root / "summary.md"
         with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary), "GITHUB_OUTPUT": ""}):
             from xrss.runtime import run
-            self.assertEqual(run(Config(["Mazda_PR", "Other"]), source, self.data, self.output,
+            self.assertEqual(run(Config(["example_account", "Other"]), source, self.data, self.output,
                                  "https://example.org", now=NOW, pause=lambda _: None), 0)
         self.assertIn("⚠️", summary.read_text(encoding="utf-8"))
         self.assertEqual(self.run_app(Config(["Other", "Broken"]), FakeSource({
@@ -98,7 +98,7 @@ class NetworkBudgetTests(unittest.TestCase):
         opener.open.return_value.__enter__ = Mock(return_value=response)
         opener.open.return_value.__exit__ = Mock(return_value=False)
         source = SyndicationSource(opener=opener)
-        self.assertEqual(len(source.fetch("Mazda_PR")), 1)
+        self.assertEqual(len(source.fetch("example_account")), 1)
         opener.open.assert_called_once()
         self.assertEqual(source.last_response["http_status"], 200)
         self.assertNotIn("secret", json.dumps(source.last_response))
@@ -107,7 +107,7 @@ class NetworkBudgetTests(unittest.TestCase):
         opener = Mock()
         opener.open.side_effect = HTTPError("https://syndication.twitter.com/", 503, "Unavailable", {}, io.BytesIO())
         with self.assertRaises(FetchError) as caught:
-            SyndicationSource(opener=opener).fetch("Mazda_PR")
+            SyndicationSource(opener=opener).fetch("example_account")
         self.assertTrue(caught.exception.transient)
         opener.open.assert_called_once()
         self.assertIsNone(DirectOnlyRedirect().redirect_request(None, None, 302, "", {}, "https://syndication.twitter.com/next"))
@@ -127,7 +127,7 @@ class NetworkBudgetTests(unittest.TestCase):
         probe = yaml.load((base / "probe.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
         publish = yaml.load((base / "publish-pages.yml").read_text(), Loader=yaml.BaseLoader)
         self.assertEqual(set(update["on"]), {"schedule", "workflow_dispatch"})
-        self.assertEqual(update["on"]["schedule"][0]["cron"], "37 * * * *")
+        self.assertEqual(update["on"]["schedule"][0]["cron"], "7,22,37,52 * * * *")
         self.assertEqual(set(probe["on"]), {"workflow_dispatch"})
         self.assertIn("push", publish["on"])
         commands = [step.get("run", "") for step in publish["jobs"]["publish"]["steps"]]

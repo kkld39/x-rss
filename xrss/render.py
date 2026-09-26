@@ -133,8 +133,9 @@ dl{{margin:16px 0}}dl div{{margin:0 0 12px}}dt{{font-size:.76rem;color:#607083}}
 details{{border-top:1px solid #e4eaf1;margin-top:20px;padding-top:14px;font-size:.82rem;min-width:0}}summary{{cursor:pointer;font-weight:600;min-height:32px;color:#805000}}details p,pre{{overflow-wrap:anywhere;white-space:pre-wrap;max-width:100%}}pre{{background:#f5f7fa;padding:12px;border-radius:8px;font-size:.72rem}}footer{{margin-top:30px;color:#607083;font-size:.78rem}}a:focus-visible,summary:focus-visible{{outline:3px solid #80b9ff;outline-offset:4px}}
 @media(max-width:480px){{body{{padding:24px 16px}}.account{{padding:20px 16px}}.accounts{{gap:16px}}.subscribe{{padding:10px 12px}}}}
 </style></head><body><main><p class="eyebrow">PERSONAL RSS READER</p><h1>X RSS フィード</h1>
-<p class="intro">「RSSを購読」のリンク先をInoreaderに登録してください。毎時37分に更新を試み、取得できない場合も保存済みの投稿を配信します。</p>
+<p class="intro">「RSSを購読」のリンク先をInoreaderに登録してください。毎時7・22・37・52分に、順番待ちのアカウントを最大1件だけ確認します。取得できない場合も保存済みの投稿を配信します。</p>
 <p class="updated">ページ更新: <time datetime="{esc(updated)}">{esc(display_time(updated))}</time></p>
+<h2>現在の監視対象（{len(accounts)}件）</h2><p class="intro">更新間隔の目安: 約{max(60, 15 * len(accounts))}分／アカウント。実行遅延や待機期限により長くなります。</p>
 <section class="accounts" aria-label="監視アカウント">{''.join(cards)}</section></main>
 <footer>非公式の個人用フィードです。Xや各投稿者とは無関係です。取得成功は全投稿の網羅を保証しません。
 GitHubの共有IP帯などに対する制限やX側の仕様変更により、長時間更新できない場合があります。画像はXの配信元を参照します。</footer></body></html>'''

@@ -7,6 +7,7 @@ import sys
 from .config import load_config, validate_site_url
 from .runtime import publish_cached, run
 from .source import SyndicationSource
+from .scheduler import run_scheduled
 
 LOG = logging.getLogger("xrss")
 
@@ -25,7 +26,7 @@ def main():
         if args.publish_only:
             return publish_cached(config, args.data_dir, args.output)
         site_url = validate_site_url(config.site_url or args.site_url)
-        return run(config, SyndicationSource(), args.data_dir, args.output, site_url)
+        return run_scheduled(config, SyndicationSource(), args.data_dir, args.output, site_url)
     except Exception as exc:
         LOG.error("実行を開始・完了できませんでした: %s: %s", type(exc).__name__, exc)
         return 2

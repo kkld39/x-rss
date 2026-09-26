@@ -5,7 +5,6 @@ import json
 import logging
 import os
 from pathlib import Path
-import time
 from xml.etree import ElementTree as ET
 
 from .config import Config
@@ -70,15 +69,13 @@ def record_attempt(data_dir, handle, record):
 
 
 def run(config: Config, source: Source, data_dir: Path, output: Path, site_url: str,
-        *, pause=time.sleep, now=None) -> int:
+        *, pause=None, now=None, render_accounts=None) -> int:
     now = now or datetime.now(timezone.utc).isoformat()
     current = timestamp(now)
     states = load_status(data_dir)
     successes = warnings = errors = 0
     reports = []
-    for number, handle in enumerate(config.accounts):
-        if number:
-            pause(2)
+    for handle in config.accounts:
         state = dict(states.get(handle.lower(), {}))
         state.update(last_check=now, new_count=0, request_count=0)
         cached = False
@@ -153,7 +150,7 @@ def run(config: Config, source: Source, data_dir: Path, output: Path, site_url: 
             "run_id": os.environ.get("GITHUB_RUN_ID"), "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         })
     atomic_write(data_dir / "_meta/status.json", json_bytes(states))
-    atomic_write(output / "index.html", index(config.accounts, states, output, now))
+    atomic_write(output / "index.html", index(render_accounts or config.accounts, states, output, now))
     atomic_write(output / ".nojekyll", b"")
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a", encoding="utf-8") as stream:
