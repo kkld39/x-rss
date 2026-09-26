@@ -138,5 +138,25 @@
     "next_request_at": null,
     "run_id": "36242128740",
     "run_attempt": "1"
+  },
+  {
+    "checked_at": "2026-09-26T16:43:22.095425+00:00",
+    "request_count": 1,
+    "health": "warning",
+    "response": {
+      "http_status": 429,
+      "observed_at": "2026-09-26T16:43:22.173467+00:00",
+      "date": "Sat, 26 Sep 2026 16:43:22 GMT",
+      "x_rate_limit_limit": "30",
+      "x_rate_limit_remaining": "0",
+      "x_rate_limit_reset": "1790441098",
+      "x_transaction_id": "ca24fc611521867c",
+      "cf_ray": "a413ba275b7f12fc-IAD",
+      "reset_at": "2026-09-26T16:44:58+00:00"
+    },
+    "error": "HTTP 429 (reset=2026-09-26T16:44:58+00:00, Retry-After=不明)",
+    "next_request_at": "2026-09-26T17:43:22.095425+00:00",
+    "run_id": "36256456836",
+    "run_attempt": "1"
   }
 ]
