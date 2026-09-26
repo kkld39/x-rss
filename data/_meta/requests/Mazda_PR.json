@@ -118,5 +118,25 @@
     "next_request_at": "2026-09-26T08:51:19.521116+00:00",
     "run_id": "36228036946",
     "run_attempt": "1"
+  },
+  {
+    "checked_at": "2026-09-26T12:30:34.957738+00:00",
+    "request_count": 1,
+    "health": "success",
+    "response": {
+      "http_status": 200,
+      "observed_at": "2026-09-26T12:30:35.464852+00:00",
+      "date": "Sat, 26 Sep 2026 12:30:35 GMT",
+      "x_rate_limit_limit": "30",
+      "x_rate_limit_remaining": "4",
+      "x_rate_limit_reset": "1790426679",
+      "x_transaction_id": "317bb3868a8c3755",
+      "cf_ray": "a41247dcaa5a1d4c-IAD",
+      "reset_at": "2026-09-26T12:44:39+00:00"
+    },
+    "error": null,
+    "next_request_at": null,
+    "run_id": "36242128740",
+    "run_attempt": "1"
   }
 ]
